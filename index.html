@@ -83,7 +83,7 @@
 
   <div id="posts"></div>
 
-  <script>
+   <script>
     const firebaseConfig = {
       apiKey: "AIzaSyCcjYypgcseE1v-IJww5GCRZDFqZnwuYI4",
       authDomain: "anounypost.firebaseapp.com",
@@ -98,21 +98,39 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
+    // ✅ Post form with rate limiting
     document.getElementById("postForm").addEventListener("submit", function (e) {
       e.preventDefault();
       const text = document.getElementById("postText").value.trim();
+      const now = Date.now();
+      const lastPostTime = localStorage.getItem("lastPostTime");
+
+      if (lastPostTime && now - lastPostTime < 30000) {
+        alert("⏳ Please wait 30 seconds before posting again.");
+        return;
+      }
+
       if (text) {
         db.ref("posts").push({
           content: text,
-          timestamp: Date.now(),
+          timestamp: now,
           upvotes: 0,
           downvotes: 0
         });
+        localStorage.setItem("lastPostTime", now);
         document.getElementById("postText").value = "";
       }
     });
 
+    // ✅ Vote function with 1-vote-per-post limit
     function updateVote(id, type) {
+      const voteKey = `voted_${id}`;
+      if (localStorage.getItem(voteKey)) {
+        alert("🛑 You've already voted on this post.");
+        return;
+      }
+      localStorage.setItem(voteKey, "true");
+
       const ref = db.ref("posts/" + id + "/" + type);
       ref.transaction(current => (current || 0) + 1);
     }
@@ -138,23 +156,23 @@
       });
     }
 
-db.ref("posts").on("value", function(snapshot) {
-  const postsDiv = document.getElementById("posts");
-  postsDiv.innerHTML = "";
-  const data = snapshot.val();
-  if (data) {
-    const entries = Object.entries(data).map(([id, post]) => ({ id, ...post }));
+    db.ref("posts").on("value", function(snapshot) {
+      const postsDiv = document.getElementById("posts");
+      postsDiv.innerHTML = "";
+      const data = snapshot.val();
+      if (data) {
+        const entries = Object.entries(data).map(([id, post]) => ({ id, ...post }));
 
-    // ✅ Sort from highest to lowest score
-    entries.sort((a, b) => {
-      const scoreA = (a.upvotes || 0) - (a.downvotes || 0);
-      const scoreB = (b.upvotes || 0) - (b.downvotes || 0);
-      return scoreB - scoreA;
-    });
+        // ✅ Sort posts by score (highest to lowest)
+        entries.sort((a, b) => {
+          const scoreA = (a.upvotes || 0) - (a.downvotes || 0);
+          const scoreB = (b.upvotes || 0) - (b.downvotes || 0);
+          return scoreB - scoreA;
+        });
+
         entries.forEach(post => {
           const div = document.createElement("div");
           div.className = "post";
-
           if (post.content.toLowerCase().includes("miss")) {
             div.classList.add("valentine");
           }
@@ -183,7 +201,6 @@ db.ref("posts").on("value", function(snapshot) {
 
           postsDiv.appendChild(div);
 
-          // Load comments
           const commentsDiv = div.querySelector(`#comments-${post.id}`);
           loadComments(post.id, commentsDiv);
         });
