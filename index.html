@@ -6,6 +6,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 
   <style>
+    
     body {
       font-family: sans-serif;
       background: #f9f9f9;
@@ -29,7 +30,7 @@
       padding: 8px 16px;
       font-size: 14px;
       border-radius: 6px;
-      background-color: #007bff;
+      background-color: #1c1d1f;
       color: white;
       border: none;
       cursor: pointer;
@@ -190,12 +191,13 @@
             <div class="comments" id="comments-${post.id}"></div>
 
             <form onsubmit="event.preventDefault(); 
-              const input = this.querySelector('input');
-              if (input.value.trim()) {
+            const input = this.querySelector('input');
+            if (input.value.trim()) {
                 addComment('${post.id}', input.value.trim());
                 input.value = '';
-              }">
-              <input type="text" placeholder="Add a comment..."/>
+            }">
+            <input type="text" placeholder="Add a comment..." />
+            <button type="submit">Send</button>
             </form>
           `;
 
