@@ -1,25 +1,89 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Anonymous Posting</title>
+  <title>Anonymous Wall 💬</title>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+
   <style>
-    body { font-family: sans-serif; padding: 20px; max-width: 600px; margin: auto; }
-    textarea { width: 100%; height: 100px; }
-    .post { background: #f0f0f0; padding: 10px; margin: 10px 0; border-radius: 5px; }
+    body {
+      font-family: sans-serif;
+      background: #f9f9f9;
+      padding: 20px;
+      max-width: 600px;
+      margin: auto;
+    }
+
+    textarea, input[type="text"] {
+      width: 100%;
+      padding: 10px;
+      font-size: 16px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      margin-top: 10px;
+      resize: none;
+    }
+
+    button {
+      margin-top: 5px;
+      padding: 8px 16px;
+      font-size: 14px;
+      border-radius: 6px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+
+    .post {
+      background: #f0f0f0;
+      padding: 25px;
+      margin: 15px;
+      border-radius: 5px;
+    }
+
+    .valentine {
+      background: #ffe6f0;
+      color: #c71585;
+      border: 2px dashed #ff69b4;
+      font-family: 'Comic Sans MS', cursive;
+      padding: 10px;
+      box-shadow: 0 0 10px rgba(255, 105, 180, 0.3);
+    }
+
+    .vote-section {
+      margin-top: 8px;
+    }
+
+    .score {
+      font-weight: bold;
+      margin: 0 8px;
+    }
+
+    .comments {
+      margin-top: 10px;
+      padding-left: 10px;
+      border-left: 2px solid #ccc;
+    }
+
+    .comment {
+      font-size: 14px;
+      margin: 4px 0;
+    }
   </style>
 </head>
 <body>
-  <h2>Anonymous Wall</h2>
+
+  <h2>Anonymous Wall 💬</h2>
+
   <form id="postForm">
-    <textarea id="postText" placeholder="Type something..." required></textarea><br>
+    <textarea id="postText" placeholder="Type something..."></textarea><br>
     <button type="submit">Post</button>
   </form>
+
   <div id="posts"></div>
 
   <script>
-    // ✅ Your Firebase confi
     const firebaseConfig = {
       apiKey: "AIzaSyCcjYypgcseE1v-IJww5GCRZDFqZnwuYI4",
       authDomain: "anounypost.firebaseapp.com",
@@ -31,38 +95,105 @@
       measurementId: "G-BZBQV4WDPT"
     };
 
-    // 🔌 Initialize Firebase
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    // 📨 Submit post
     document.getElementById("postForm").addEventListener("submit", function (e) {
       e.preventDefault();
       const text = document.getElementById("postText").value.trim();
       if (text) {
         db.ref("posts").push({
           content: text,
-          timestamp: Date.now()
+          timestamp: Date.now(),
+          upvotes: 0,
+          downvotes: 0
         });
         document.getElementById("postText").value = "";
       }
     });
 
-    // 📥 Load posts in real-time
-    db.ref("posts").on("value", function(snapshot) {
-      const postsDiv = document.getElementById("posts");
-      postsDiv.innerHTML = "";
-      const data = snapshot.val();
-      if (data) {
-        const entries = Object.entries(data).sort((a, b) => b[1].timestamp - a[1].timestamp);
-        entries.forEach(([id, post]) => {
+    function updateVote(id, type) {
+      const ref = db.ref("posts/" + id + "/" + type);
+      ref.transaction(current => (current || 0) + 1);
+    }
+
+    function addComment(postId, commentText) {
+      db.ref(`comments/${postId}`).push({
+        text: commentText,
+        timestamp: Date.now()
+      });
+    }
+
+    function loadComments(postId, container) {
+      const commentsRef = db.ref(`comments/${postId}`);
+      commentsRef.on("value", snapshot => {
+        container.innerHTML = "";
+        snapshot.forEach(child => {
+          const comment = child.val();
+          const div = document.createElement("div");
+          div.className = "comment";
+          div.textContent = "💬 " + comment.text;
+          container.appendChild(div);
+        });
+      });
+    }
+
+db.ref("posts").on("value", function(snapshot) {
+  const postsDiv = document.getElementById("posts");
+  postsDiv.innerHTML = "";
+  const data = snapshot.val();
+  if (data) {
+    const entries = Object.entries(data).map(([id, post]) => ({ id, ...post }));
+
+    // ✅ Sort from highest to lowest score
+    entries.sort((a, b) => {
+      const scoreA = (a.upvotes || 0) - (a.downvotes || 0);
+      const scoreB = (b.upvotes || 0) - (b.downvotes || 0);
+      return scoreB - scoreA;
+    });
+        entries.forEach(post => {
           const div = document.createElement("div");
           div.className = "post";
-          div.textContent = post.content;
+
+          if (post.content.toLowerCase().includes("miss")) {
+            div.classList.add("valentine");
+          }
+
+          const score = (post.upvotes || 0) - (post.downvotes || 0);
+
+          div.innerHTML = `
+            <div><strong>${highlightWord(post.content, "miss")}</strong></div>
+            <div class="vote-section">
+              <button onclick="updateVote('${post.id}', 'upvotes')">👍</button>
+              <span class="score">${score}</span>
+              <button onclick="updateVote('${post.id}', 'downvotes')">👎</button>
+            </div>
+
+            <div class="comments" id="comments-${post.id}"></div>
+
+            <form onsubmit="event.preventDefault(); 
+              const input = this.querySelector('input');
+              if (input.value.trim()) {
+                addComment('${post.id}', input.value.trim());
+                input.value = '';
+              }">
+              <input type="text" placeholder="Add a comment..."/>
+            </form>
+          `;
+
           postsDiv.appendChild(div);
+
+          // Load comments
+          const commentsDiv = div.querySelector(`#comments-${post.id}`);
+          loadComments(post.id, commentsDiv);
         });
       }
     });
+
+    function highlightWord(text, word) {
+      const regex = new RegExp(`(${word})`, 'gi');
+      return text.replace(regex, `<span style="color:deeppink;">$1</span>`);
+    }
   </script>
 </body>
 </html>
